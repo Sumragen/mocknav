@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MockNav</title>
+</head>
+<body>
+
+<script src="../mocknav.js"></script>
+
+<script>
+  MockNav.init({
+    title: 'My Project',
+
+    pages: [
+      {
+        id:    'home',
+        name:  'Home',
+        file:  'pages/home.html',
+        group: 'Public',
+        states: [
+          { id: 'default', label: 'Default' },
+          { id: 'loading', label: 'Loading' },
+        ],
+      },
+      {
+        id:    'login',
+        name:  'Login',
+        file:  'pages/auth/login.html',
+        group: 'Auth',
+        tags:  ['form'],
+        states: [
+          { id: 'default', label: 'Default' },
+          { id: 'error',   label: 'Error'   },
+          { id: 'loading', label: 'Sending'  },
+        ],
+      },
+      {
+        id:    'dashboard',
+        name:  'Dashboard',
+        file:  'pages/app/dashboard.html',
+        group: 'App',
+        badge: 'wip',
+        states: [
+          { id: 'default', label: 'Default' },
+          { id: 'empty',   label: 'Empty'   },
+        ],
+      },
+    ],
+  });
+</script>
+
+</body>
+</html>

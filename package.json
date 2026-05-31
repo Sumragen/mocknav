@@ -1,0 +1,46 @@
+{
+  "name": "mocknav",
+  "version": "1.0.0",
+  "description": "Lightweight zero-dependency JS navigator for HTML mockup folders",
+  "main": "mocknav.js",
+  "unpkg": "mocknav.min.js",
+  "jsdelivr": "mocknav.min.js",
+  "exports": {
+    ".": "./mocknav.js",
+    "./min": "./mocknav.min.js"
+  },
+  "files": [
+    "mocknav.js",
+    "mocknav.min.js",
+    "LICENSE",
+    "README.md",
+    "DOCS.md"
+  ],
+  "scripts": {
+    "build": "esbuild mocknav.js --minify --outfile=mocknav.min.js --banner:js=\"/* mocknav.min.js | MIT github.com/Sumragen/mocknav */\"",
+    "demo": "npx --yes serve .",
+    "prepublishOnly": "npm run build && node --check mocknav.js && node --check mocknav.min.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sumragen/mocknav.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Sumragen/mocknav/issues"
+  },
+  "homepage": "https://github.com/Sumragen/mocknav#readme",
+  "keywords": [
+    "mockup",
+    "html",
+    "prototype",
+    "wireframe",
+    "design",
+    "static",
+    "navigator"
+  ],
+  "author": "Hennadii Varava",
+  "license": "MIT",
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}
