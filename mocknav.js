@@ -303,6 +303,10 @@
       min-height: 100%;
     }
 
+    .mn-page-content.mn-pending {
+      visibility: hidden;
+    }
+
     .mn-mockup-body {
       position: relative;
       min-height: 100%;
@@ -447,6 +451,8 @@
   let pages   = [];
   let st      = { pageId: null, stateId: null, device: 'desktop', query: '' };
   let cfg     = {};
+  /** External script URLs already loaded this session (shared CDNs, etc.) */
+  const loadedScripts = new Set();
 
   const $ = id => document.getElementById(id);
 
@@ -586,16 +592,46 @@
     return root;
   }
 
-  function runExternalScripts(root) {
-    for (const old of [...root.querySelectorAll('script')]) {
-      if (!old.src) {
-        old.remove();
+  function stripInlineScripts(root) {
+    for (const old of [...root.querySelectorAll('script:not([src])')]) old.remove();
+  }
+
+  function waitScript(el) {
+    if (el.dataset.mnLoaded) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      el.addEventListener('load', () => {
+        el.dataset.mnLoaded = '1';
+        resolve();
+      }, { once: true });
+      el.addEventListener('error', () => reject(new Error(`Failed to load ${el.src}`)), { once: true });
+    });
+  }
+
+  /** Load external scripts in order; skip URLs already fetched this session. */
+  async function ensureScripts(srcs, parent) {
+    for (const src of srcs) {
+      const abs = new URL(src, location.href).href;
+      if (loadedScripts.has(abs)) continue;
+
+      const inTree = [...parent.querySelectorAll('script[src]'), ...document.querySelectorAll('script[src]')]
+        .find(s => new URL(s.src).href === abs);
+
+      if (inTree) {
+        await waitScript(inTree);
+        loadedScripts.add(abs);
         continue;
       }
+
       const el = document.createElement('script');
-      el.src = old.src;
-      old.replaceWith(el);
+      el.src = src;
+      parent.appendChild(el);
+      await waitScript(el);
+      loadedScripts.add(abs);
     }
+  }
+
+  function settlePaint() {
+    return new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
   }
 
   function loadPageFrame(viewport, file, pageName) {
@@ -625,9 +661,12 @@
 
     const doc  = new DOMParser().parseFromString(html, 'text/html');
     const root = buildMockRoot(doc.body, stateId);
+    const bodyScripts = [...root.querySelectorAll('script[src]')].map(s => s.src);
+    stripInlineScripts(root);
+    for (const old of [...root.querySelectorAll('script[src]')]) old.remove();
 
     const wrap = document.createElement('div');
-    wrap.className = 'mn-page-content';
+    wrap.className = 'mn-page-content mn-pending';
 
     for (const node of doc.head.querySelectorAll('style, link[rel="stylesheet"]')) {
       if (node.tagName === 'STYLE') {
@@ -639,9 +678,16 @@
       }
     }
 
-    wrap.appendChild(root);
-    runExternalScripts(root);
     viewport.appendChild(wrap);
+
+    const headScripts = [...doc.head.querySelectorAll('script[src]')].map(s => s.src);
+    await ensureScripts(headScripts, wrap);
+
+    wrap.appendChild(root);
+    await ensureScripts(bodyScripts, root);
+
+    await settlePaint();
+    wrap.classList.remove('mn-pending');
   }
 
   async function loadPage(page, stateId) {

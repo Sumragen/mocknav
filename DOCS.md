@@ -203,7 +203,17 @@ Both options work; use whichever keeps your code simpler.
 
 ---
 
-## CSS isolation
+## CSS in mockups
+
+**Tailwind CDN** — add the Play CDN script to each mockup’s `<head>`:
+
+```html
+<script src="https://cdn.tailwindcss.com"></script>
+```
+
+Works standalone and inside MockNav (`file://` via iframe, `http://` via inject). In inject mode, MockNav waits for `<script src>` tags in the mockup (head and body) to load before showing the page — any CDN, not Tailwind-specific. Keep a small `<style>` block for `body.state-*` rules if you use states.
+
+**Custom CSS** — prefix selectors (`.login-`, `.dash-`) so styles do not leak when mockups are injected without an iframe. See [CSS isolation](#css-isolation) below.
 
 MockNav renders mockup HTML directly into the page (no iframe). This means styles from one mockup can affect another if you use global selectors.
 
