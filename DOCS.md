@@ -1,6 +1,6 @@
 # MockNav — Documentation
 
-MockNav is a single JavaScript file that turns a folder of HTML mockups into a navigable panel with page switching, state previews, and device simulation. No build step, no dependencies.
+MockNav is a single JavaScript file that turns a folder of HTML mockups into a navigable panel with page switching, state previews, device simulation, and in-mockup link navigation. No build step, no dependencies.
 
 **New here?** Start with [README.md](README.md), then use this file as the full reference.
 
@@ -21,7 +21,7 @@ Run the demo: `npm run demo`, then open `http://localhost:3000/example/` (serves
 
 ## How it works
 
-You keep one `index.html` that bootstraps MockNav, and your mockups live as regular HTML files alongside it. MockNav fetches each file on demand and renders it directly into the preview panel.
+You keep one `index.html` that bootstraps MockNav, and your mockups live as regular HTML files alongside it. Each mockup loads in an **iframe** inside the preview panel — scripts run natively, styles stay isolated, and clicks on internal links are intercepted so navigation stays inside MockNav.
 
 ```
 your-project/
@@ -37,8 +37,6 @@ your-project/
 Load `mocknav.js` from a CDN, npm, or a local copy — mockups are always your own HTML files.
 
 Each mockup is a normal HTML file — it opens on its own in a browser, and also works inside MockNav. No special wrapper, no required structure.
-
----
 
 ---
 
@@ -107,7 +105,7 @@ cp node_modules/mocknav/mocknav.js .
 </html>
 ```
 
-**3. Open `index.html`** in your browser. On `file://`, MockNav loads mockups in an iframe (browsers block `fetch` for local files). A local server also works:
+**3. Open `index.html`** in your browser — works on `file://` and with a local server:
 
 ```
 npx serve .
@@ -154,11 +152,13 @@ States let you show the same page in different conditions — filled form, empty
 
 ### How MockNav passes the state
 
-When a state is selected, MockNav appends `?state=<id>` to the file URL before fetching it:
+When a state is selected, MockNav loads the page in an iframe. For non-default states it appends `?state=<id>` to the file URL:
 
 ```
 pages/auth/login.html?state=error
 ```
+
+The default state loads the file without a `?state=` parameter.
 
 Your mockup reads this and applies a CSS class to `<body>`:
 
@@ -169,10 +169,6 @@ Your mockup reads this and applies a CSS class to `<body>`:
   if (s) document.body.classList.add('state-' + s);
 </script>
 ```
-
-Inside MockNav’s preview panel, the library applies `state-<id>` on an embedded root (`.mn-mockup-body`) for you — the snippet above is not required for toolbar state switching, only when the file is opened directly.
-
-For full-screen state overlays, prefer `position: absolute` on a positioned ancestor (or `body::after` with `inset: 0`) instead of `position: fixed`, so the overlay stays inside the preview and does not block the MockNav sidebar.
 
 Then in CSS, style each state:
 
@@ -187,6 +183,24 @@ body.state-error .login-field input[type=password] { border-color: #e24b4a; }
 /* loading state */
 body.state-loading .login-submit { opacity: .5; pointer-events: none; }
 ```
+
+For full-screen state overlays inside the iframe, prefer `position: absolute` on a positioned ancestor (or `body::after` with `inset: 0`) instead of `position: fixed`, so the overlay stays inside the preview viewport.
+
+### Interactive state sync
+
+When a user clicks inside the mockup (e.g. submit → loading → error), the toolbar can stay in sync without reloading the iframe.
+
+**From inside the mockup**, call the injected helper:
+
+```js
+mnNotifyState('loading');
+// later…
+mnNotifyState('error');
+```
+
+MockNav injects `mnNotifyState` into each iframe after load. It posts a message to the parent, which updates the active state pill and URL hash.
+
+**Fallback:** if your mockup adds `state-<id>` to `<body>` via JavaScript (instead of calling `mnNotifyState`), MockNav watches `body.classList` and syncs automatically.
 
 ### State with a separate file
 
@@ -203,7 +217,29 @@ Both options work; use whichever keeps your code simpler.
 
 ---
 
+## Link navigation
+
+MockNav intercepts clicks on internal links inside the iframe. When a user clicks `<a href="other-page.html">`, MockNav finds the matching page in your config and navigates to it — instead of loading the file inside the iframe alone.
+
+Supported link types:
+
+| href | Behaviour |
+|------|-----------|
+| `login.html` | Navigate to the page whose `file` ends with `login.html` |
+| `login.html?state=error` | Navigate to that page in the `error` state |
+| `#section` | Ignored — normal anchor behaviour |
+| `https://…` | Ignored — opens normally (or use `target="_blank"`) |
+| `mailto:`, `tel:`, `javascript:` | Ignored |
+
+Links are resolved relative to the current iframe URL. If no matching page exists in the config, the link opens in a new tab as a fallback.
+
+Use normal `<a href="…">` tags between mockups to prototype user flows without JavaScript routing.
+
+---
+
 ## CSS in mockups
+
+Because each mockup runs in its own iframe, styles do not leak between pages. You can use global selectors (`nav`, `h1`, etc.) without affecting other mockups.
 
 **Tailwind CDN** — add the Play CDN script to each mockup’s `<head>`:
 
@@ -211,41 +247,40 @@ Both options work; use whichever keeps your code simpler.
 <script src="https://cdn.tailwindcss.com"></script>
 ```
 
-Works standalone and inside MockNav (`file://` via iframe, `http://` via inject). In inject mode, MockNav waits for `<script src>` tags in the mockup (head and body) to load before showing the page — any CDN, not Tailwind-specific. Keep a small `<style>` block for `body.state-*` rules if you use states.
+Works standalone and inside MockNav. Keep a small `<style>` block for `body.state-*` rules if you use states.
 
-**Custom CSS** — prefix selectors (`.login-`, `.dash-`) so styles do not leak when mockups are injected without an iframe. See [CSS isolation](#css-isolation) below.
-
-MockNav renders mockup HTML directly into the page (no iframe). This means styles from one mockup can affect another if you use global selectors.
-
-**The convention:** prefix every CSS selector with the page name.
-
-```css
-/* ✗ leaks */
-nav { background: red; }
-h1  { font-size: 48px; }
-
-/* ✓ contained */
-.home-nav { background: red; }
-.home-hero h1 { font-size: 48px; }
-```
-
-Keep the prefix short — two to four characters is fine: `.lg-`, `.dash-`, `.prof-`. The sidebar name makes a natural choice.
-
-When you open a mockup on its own (`file://` or direct URL), the prefix has zero impact — it's just a class name. When MockNav loads it, styles stay contained.
+**Optional prefix convention** — some teams still prefix selectors (`.login-`, `.dash-`) for clarity when sharing CSS snippets or opening mockups side by side in separate tabs. It is not required for MockNav isolation.
 
 ---
 
 ## Device preview
 
-The toolbar has three device buttons that resize the preview viewport:
+The toolbar has three device buttons that resize the preview viewport with realistic device chrome:
 
-| Button | Width   | Simulates            |
-|--------|---------|----------------------|
-| ⬛     | 100%    | Desktop              |
-| ▬      | 768px   | Tablet               |
-| ▯      | 390px   | Mobile (iPhone size) |
+| Button | Shortcut | Size | Simulates |
+|--------|----------|------|-----------|
+| Desktop | `D` | Fluid (max 1440px) | Browser window with macOS-style title bar |
+| Tablet  | `T` | 768 × 946 px | Tablet card |
+| Mobile  | `M` | 393 × 852 px | iPhone 15/16 shell with dynamic island |
 
-Your mockup should use responsive CSS so it looks right at each width. The viewport scrolls if the content is taller than the panel.
+Your mockup should use responsive CSS so it looks right at each width. The stage scrolls if the device frame is taller than the panel.
+
+---
+
+## Keyboard shortcuts
+
+| Key | Action |
+|-----|--------|
+| `⌘K` / `Ctrl+K` | Focus search |
+| `B` | Toggle sidebar |
+| `R` | Reload current mockup |
+| `D` / `T` / `M` | Desktop / tablet / mobile |
+| `←` / `→` | Previous / next state |
+| `↑` / `↓` | Previous / next page |
+| `1`–`9` | Jump to page by position |
+| `Esc` | Clear search (when search is focused) |
+
+Shortcuts are disabled while typing in an input or textarea.
 
 ---
 
@@ -267,47 +302,62 @@ Your mockup should use responsive CSS so it looks right at each width. The viewp
 | `done`   | Blue   |
 | `review` | Pink   |
 
-**State dots** — the small coloured circles next to each page name indicate which states the page has. The colour is driven by the state `id`:
+**State dots** — the small coloured circles next to each page name indicate which states the page has. The colour is inferred from the state `id`:
 
-| id        | Colour      |
-|-----------|-------------|
-| `default` | Grey        |
-| `hover`   | Blue        |
-| `active`  | Purple      |
-| `error`   | Red         |
-| `success` | Green       |
-| `loading` | Yellow      |
-| `empty`   | Light blue  |
-
-Any other `id` gets a grey dot.
+| id contains | Colour      |
+|-------------|-------------|
+| `error`, `fail` | Red     |
+| `success`, `done`, `complete` | Green |
+| `loading`, `process` | Yellow |
+| `empty`, `new` | Light blue |
+| `active`, `premium` | Purple |
+| other | Grey |
 
 **Search** — the search box filters by page name, group, and tags simultaneously.
 
 ---
 
-## Open in new tab
+## URL hash routing
 
-The status bar at the bottom shows the path of the current file and an **↗ open** link that opens the mockup directly in a new tab — useful for sharing a specific page with a teammate.
+The current page and state are kept in the URL hash:
+
+```
+index.html#login/error
+```
+
+Refreshing or sharing this link restores the same view. Hash format: `#<pageId>/<stateId>`.
 
 ---
 
-## Programmatic navigation
+## Open in new tab / copy link
+
+The status bar shows the path of the current mockup file. The **↗ open** link opens that file directly in a new tab — useful for sharing a specific page with a teammate.
+
+The toolbar **copy link** button copies the iframe URL (including `?state=` when applicable) to the clipboard.
+
+---
+
+## Programmatic API
 
 ```js
-MockNav.go('login'); // navigate to a page by its id
-```
+MockNav.init({ title: '…', pages: [ /* … */ ] });
 
-The current page and state are kept in the URL hash (`#login/error`). Refreshing or sharing the link restores the same view.
+MockNav.go('login');              // navigate to a page (optional second arg: stateId)
+MockNav.setState('error');        // switch state on the current page (reloads iframe)
+MockNav.notifyState('loading');   // sync toolbar/hash without reload (same as mnNotifyState)
+MockNav.reload();                 // reload the current iframe
+MockNav.setDevice('mobile');      // 'desktop' | 'tablet' | 'mobile'
+```
 
 ---
 
 ## Local files (`file://`)
 
-Browsers block `fetch()` on `file://` URLs. MockNav detects this and loads each mockup in an **iframe** instead — double-click `index.html` and it should work in Chrome, Safari, and Firefox.
+MockNav always loads mockups in an iframe. This works on `file://` — double-click `index.html` and it should work in Chrome, Safari, and Firefox. Scripts inside mockups (Tailwind CDN, inline handlers) run normally.
 
 States still use `?state=` in the iframe URL, so the mockup state snippet in each HTML file works as documented.
 
-For `http://` (local server), mockups are injected directly into the panel (no iframe). Use a server if you prefer that mode or need to test without iframe isolation:
+For team sharing or when `file://` restrictions apply in your browser, use a local server:
 
 ```bash
 npx serve .            # fastest
@@ -322,14 +372,14 @@ Or use the **Live Server** extension in VS Code (right-click `index.html` → Op
 
 When prompting an AI (Claude, ChatGPT, etc.) to generate a mockup that will be used inside MockNav, include this in your prompt:
 
-> Prefix all CSS selectors with `.<pagename>-` (e.g. `.login-`, `.dash-`) to avoid style leaks. At the bottom of the file, add this snippet:
+> At the bottom of the file, add this snippet:
 > ```html
 > <script>
 >   const s = new URLSearchParams(location.search).get('state');
 >   if (s) document.body.classList.add('state-' + s);
 > </script>
 > ```
-> Then write CSS for each state using `body.state-<id>` selectors.
+> Then write CSS for each state using `body.state-<id>` selectors. Use normal `<a href="other-page.html">` links between mockup files for navigation.
 
 This produces mockups that work both standalone and inside MockNav without any editing.
 
@@ -353,12 +403,14 @@ This produces mockups that work both standalone and inside MockNav without any e
       title: 'Demo',
       pages: [
         {
+          id:    'landing',
           name:  'Landing',
           file:  'pages/landing.html',
           group: 'Public',
           badge: 'done',
         },
         {
+          id:    'login',
           name:  'Login',
           file:  'pages/auth/login.html',
           group: 'Auth',
@@ -370,6 +422,7 @@ This produces mockups that work both standalone and inside MockNav without any e
           ],
         },
         {
+          id:    'dashboard',
           name:  'Dashboard',
           file:  'pages/app/dashboard.html',
           group: 'App',
@@ -381,6 +434,7 @@ This produces mockups that work both standalone and inside MockNav without any e
           ],
         },
         {
+          id:    'settings',
           name:  'Settings',
           file:  'pages/app/settings.html',
           group: 'App',
@@ -390,6 +444,7 @@ This produces mockups that work both standalone and inside MockNav without any e
           ],
         },
         {
+          id:    '404',
           name:  '404',
           file:  'pages/errors/404.html',
           group: 'Errors',

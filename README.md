@@ -2,7 +2,7 @@
 
 **One JavaScript file. Zero dependencies. No build step.**
 
-MockNav turns a folder of plain HTML mockups into a navigable preview: sidebar with groups and search, state switching, device widths, and badges for team status.
+MockNav turns a folder of plain HTML mockups into a navigable preview: sidebar with groups and search, state switching, device frames, link navigation between pages, and badges for team status.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -14,6 +14,7 @@ MockNav turns a folder of plain HTML mockups into a navigable preview: sidebar w
 | Mockup files | Normal HTML, open standalone | Often wrapped or templated |
 | Dependencies | None | Often React/Vite/etc. |
 | States | `?state=` + CSS classes | Varies |
+| In-mockup links | Intercepted → sidebar navigation | Often manual |
 
 Your designers and developers keep writing regular `.html` files. MockNav only adds a single `index.html` that lists them.
 
@@ -87,7 +88,7 @@ For local development with hot reload, you can also run:
 npx serve .
 ```
 
-Full configuration (states, badges, device preview, CSS isolation) → **[DOCS.md](DOCS.md)**
+Full configuration (states, link navigation, device preview, keyboard shortcuts) → **[DOCS.md](DOCS.md)**
 
 ## Try the demo
 
@@ -130,7 +131,11 @@ MockNav itself can load from a CDN; your mockup `.html` files stay in the projec
 
 ```js
 MockNav.init({ title: '…', pages: [ /* … */ ] });
-MockNav.go('page-id');  // programmatic navigation
+MockNav.go('page-id', 'error');   // navigate by id (+ optional state)
+MockNav.setState('loading');      // switch state on current page
+MockNav.notifyState('error');     // sync toolbar without reload
+MockNav.reload();
+MockNav.setDevice('mobile');      // desktop · tablet · mobile
 ```
 
 | Page option | Purpose |
@@ -145,8 +150,7 @@ See **[DOCS.md](DOCS.md)** for the complete reference.
 
 ## Browser notes
 
-- **`file://`** — MockNav loads mockups in an iframe (browsers block `fetch` for local files)
-- **`http://`** — mockups are injected into the panel directly; use `npx serve .` or similar
+MockNav loads every mockup in an iframe — scripts run natively, styles stay isolated. Works on **`file://`** (double-click `index.html`) and **`http://`** (`npx serve .`).
 
 ## Contributing
 

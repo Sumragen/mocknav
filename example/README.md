@@ -7,10 +7,11 @@ npm run demo
 # http://localhost:3000/example/
 ```
 
-Mockup pages under `pages/` use [Tailwind CSS via CDN](https://tailwindcss.com/docs/installation/play-cdn):
+## What this demo shows
 
-```html
-<script src="https://cdn.tailwindcss.com"></script>
-```
+- **Tailwind CDN** in each mockup — no build step
+- **States** — switch Default / Error / Loading / Empty in the toolbar (`?state=` + `body.state-*` CSS)
+- **Link navigation** — click *Get started* on Home or *Sign in* on Login; MockNav follows internal `<a href="…">` links
+- **Interactive states** — on Login, click *Sign in* to cycle loading → error via `mnNotifyState()`
 
-State variants (error, loading, empty) use a small `<style>` block with `body.state-*` selectors — see [DOCS.md](../DOCS.md#states).
+See [DOCS.md](../DOCS.md) for the full reference.
