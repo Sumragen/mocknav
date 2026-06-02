@@ -1,31 +1,18 @@
 # MockNav — Documentation
 
-MockNav is a single JavaScript file that turns a folder of HTML mockups into a navigable panel with page switching, state previews, device simulation, and in-mockup link navigation. No build step, no dependencies.
+MockNav is a single JavaScript file that turns a folder of HTML mockups into a navigable panel: sidebar, states, device widths, and click-through flows between pages. No build step, no dependencies.
 
-**New here?** Start with [README.md](README.md), then use this file as the full reference.
-
----
-
-## This repository
-
-| Path | Role |
-|------|------|
-| `mocknav.js` | Source (readable) |
-| `mocknav.min.js` | Minified build for CDN / production |
-| `example/index.html` | Demo bootstrap |
-| `example/pages/` | Sample mockups |
-
-Run the demo: `npm run demo`, then open `http://localhost:3000/example/` (serves the repo root, not only `example/`).
+Start with [README.md](README.md) for a short overview. This file is the full reference.
 
 ---
 
 ## How it works
 
-You keep one `index.html` that bootstraps MockNav, and your mockups live as regular HTML files alongside it. Each mockup loads in an **iframe** inside the preview panel — scripts run natively, styles stay isolated, and clicks on internal links are intercepted so navigation stays inside MockNav.
+You write one `index.html` that loads MockNav from a CDN and lists your mockup files. Each mockup is a normal HTML file on disk. MockNav shows them in an iframe — scripts run as usual, styles stay isolated, and clicks on internal links update the sidebar instead of navigating only inside the frame.
 
 ```
 your-project/
-├── index.html          ← bootstrap file (you edit this once)
+├── index.html
 └── pages/
     ├── home.html
     ├── auth/
@@ -34,50 +21,32 @@ your-project/
         └── dashboard.html
 ```
 
-Load `mocknav.js` from a CDN, npm, or a local copy — mockups are always your own HTML files.
-
-Each mockup is a normal HTML file — it opens on its own in a browser, and also works inside MockNav. No special wrapper, no required structure.
+Mockups work on their own (open the `.html` file directly) and inside MockNav. Nothing special to wrap or import.
 
 ---
 
-## Install
+## Setup
 
-**CDN** (recommended for static mockup folders):
+Add one script tag to your bootstrap `index.html`:
 
 ```html
 <script src="https://cdn.jsdelivr.net/npm/mocknav@1.0.0/mocknav.min.js"></script>
 ```
 
-Works with `file://` and local servers. Your mockup HTML files remain on disk — only the navigator script comes from the CDN.
+Pin the version (`@1.0.0`) so CDN updates do not surprise you. [jsDelivr](https://www.jsdelivr.com/package/npm/mocknav) · [unpkg](https://unpkg.com/mocknav@1.0.0/mocknav.min.js)
 
-**npm**:
-
-```bash
-npm install mocknav
-# optional: copy into project root
-cp node_modules/mocknav/mocknav.js .
-```
-
-**GitHub** — download [`mocknav.js`](https://github.com/Sumragen/mocknav/blob/main/mocknav.js) from the repo.
+That is all you need from MockNav itself. Your mockup files stay in your project folder.
 
 ---
 
 ## Quick start
-
-**1. Load MockNav** in your bootstrap `index.html` (CDN or local path):
-
-```html
-<script src="https://cdn.jsdelivr.net/npm/mocknav@1.0.0/mocknav.min.js"></script>
-```
-
-**2. Create `index.html`:**
 
 ```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>MockNav</title>
+  <title>My mockups</title>
 </head>
 <body>
   <script src="https://cdn.jsdelivr.net/npm/mocknav@1.0.0/mocknav.min.js"></script>
@@ -85,19 +54,8 @@ cp node_modules/mocknav/mocknav.js .
     MockNav.init({
       title: 'My Project',
       pages: [
-        {
-          name: 'Home',
-          file: 'pages/home.html',
-        },
-        {
-          name:  'Login',
-          file:  'pages/auth/login.html',
-          group: 'Auth',
-          states: [
-            { id: 'default', label: 'Default' },
-            { id: 'error',   label: 'Error'   },
-          ],
-        },
+        { id: 'home',  name: 'Home',  file: 'pages/home.html' },
+        { id: 'login', name: 'Login', file: 'pages/auth/login.html', group: 'Auth' },
       ],
     });
   </script>
@@ -105,13 +63,159 @@ cp node_modules/mocknav/mocknav.js .
 </html>
 ```
 
-**3. Open `index.html`** in your browser — works on `file://` and with a local server:
+Open `index.html` in the browser. Works on `file://` — no server required.
 
-```
-npx serve .
+---
+
+## Interactive mockups
+
+The main way to wire up a user flow is a regular link to another `.html` file. MockNav intercepts the click, finds that file in your `pages` config, and switches the sidebar to it.
+
+### Register pages in `index.html`
+
+Every mockup you want to reach by click must be listed in `MockNav.init`:
+
+```js
+MockNav.init({
+  title: 'My Project',
+  pages: [
+    { id: 'home',      name: 'Home',      file: 'pages/home.html' },
+    { id: 'login',     name: 'Login',     file: 'pages/auth/login.html' },
+    { id: 'dashboard', name: 'Dashboard', file: 'pages/app/dashboard.html' },
+  ],
+});
 ```
 
-That's it.
+MockNav matches by **filename** — `login.html` in the href must correspond to a `file` path that ends with `login.html`.
+
+### Link to another mockup
+
+From `pages/home.html`, link to login with a path **relative to the current mockup file**:
+
+```html
+<a href="auth/login.html">Get started</a>
+```
+
+From `pages/auth/login.html`, go to dashboard one folder up:
+
+```html
+<a href="../app/dashboard.html">Sign in</a>
+```
+
+Use an `<a>` tag even when it looks like a button — that is what MockNav listens for:
+
+```html
+<a href="auth/login.html" class="btn btn-primary">Get started</a>
+```
+
+When someone clicks the link inside MockNav, the sidebar jumps to that page. When they open the mockup file directly in a browser, the link works as a normal navigation.
+
+### Open a specific state
+
+Append `?state=` to the href:
+
+```html
+<a href="auth/login.html?state=error">Show login error</a>
+```
+
+The target page must define that state in `index.html`:
+
+```js
+{
+  id: 'login',
+  name: 'Login',
+  file: 'pages/auth/login.html',
+  states: [
+    { id: 'default', label: 'Default' },
+    { id: 'error',   label: 'Error'   },
+  ],
+}
+```
+
+### Full flow example
+
+**`index.html`**
+
+```js
+MockNav.init({
+  title: 'Demo',
+  pages: [
+    { id: 'home',      name: 'Home',      file: 'pages/home.html' },
+    { id: 'login',     name: 'Login',     file: 'pages/auth/login.html' },
+    { id: 'dashboard', name: 'Dashboard', file: 'pages/app/dashboard.html' },
+  ],
+});
+```
+
+**`pages/home.html`**
+
+```html
+<nav>
+  <span>My App</span>
+  <a href="auth/login.html">Log in</a>
+</nav>
+
+<main>
+  <h1>Welcome</h1>
+  <a href="auth/login.html" class="cta">Get started</a>
+</main>
+```
+
+**`pages/auth/login.html`**
+
+```html
+<form>
+  <!-- fields -->
+  <a href="../app/dashboard.html" class="submit-btn">Sign in</a>
+</form>
+```
+
+**`pages/app/dashboard.html`**
+
+```html
+<aside>
+  <a href="../home.html">← Back to home</a>
+</aside>
+```
+
+Click *Get started* → sidebar shows Login. Click *Sign in* → sidebar shows Dashboard. No JavaScript routing required.
+
+### Submit button with a loading state, then navigate
+
+If the button should show feedback before moving on, handle the click in JS but navigate through a link so MockNav stays in sync:
+
+```html
+<a href="../app/dashboard.html" id="sign-in" class="submit-btn">Sign in</a>
+
+<script>
+  document.getElementById('sign-in').addEventListener('click', function (e) {
+    e.preventDefault();
+    document.body.classList.add('state-loading');
+    if (typeof mnNotifyState === 'function') mnNotifyState('loading');
+
+    var target = this;
+    setTimeout(function () {
+      target.click(); // MockNav intercepts this second click
+    }, 600);
+  });
+</script>
+```
+
+Style the loading state in CSS (`body.state-loading …`). See [States](#states) below.
+
+### What MockNav ignores
+
+| href | Behaviour |
+|------|-----------|
+| `page.html` | Navigate to matching page in config |
+| `page.html?state=error` | Navigate + switch to that state |
+| `#section` | Normal in-page anchor |
+| `https://…` | Normal link (leave the shell) |
+| `mailto:`, `tel:`, `javascript:` | Ignored by interceptor |
+
+If the href points to an HTML file **not** listed in `pages`, MockNav opens it in a new tab.
+
+Paths are resolved relative to the current iframe URL, same as in a standalone site.
 
 ---
 
@@ -148,49 +252,43 @@ That's it.
 
 ## States
 
-States let you show the same page in different conditions — filled form, empty list, error message, loading spinner — without duplicating the whole mockup.
+States show the same page in different conditions — empty list, validation error, loading — without duplicating the whole file.
 
-### How MockNav passes the state
+### URL parameter
 
-When a state is selected, MockNav loads the page in an iframe. For non-default states it appends `?state=<id>` to the file URL:
+For non-default states MockNav loads:
 
 ```
 pages/auth/login.html?state=error
 ```
 
-The default state loads the file without a `?state=` parameter.
+Default state has no `?state=` in the URL.
 
-Your mockup reads this and applies a CSS class to `<body>`:
+Add this snippet at the bottom of each mockup (needed when opening the file directly; inside MockNav it also applies on first load):
 
 ```html
-<!-- put this at the bottom of every mockup (standalone / ↗ open in new tab) -->
 <script>
   const s = new URLSearchParams(location.search).get('state');
   if (s) document.body.classList.add('state-' + s);
 </script>
 ```
 
-Then in CSS, style each state:
+CSS:
 
 ```css
-/* default — error message is hidden */
-.login-error-msg { display: none; }
+.login-error { display: none; }
 
-/* error state — MockNav passes ?state=error */
-body.state-error .login-error-msg           { display: block; }
-body.state-error .login-field input[type=password] { border-color: #e24b4a; }
+body.state-error .login-error { display: block; }
+body.state-error .login-password { border-color: #e24b4a; }
 
-/* loading state */
-body.state-loading .login-submit { opacity: .5; pointer-events: none; }
+body.state-loading .submit-btn { opacity: .5; pointer-events: none; }
 ```
 
-For full-screen state overlays inside the iframe, prefer `position: absolute` on a positioned ancestor (or `body::after` with `inset: 0`) instead of `position: fixed`, so the overlay stays inside the preview viewport.
+For overlays inside the preview, use `position: absolute` (or `body::after` with `inset: 0`) instead of `position: fixed`.
 
-### Interactive state sync
+### Sync toolbar on click (without reload)
 
-When a user clicks inside the mockup (e.g. submit → loading → error), the toolbar can stay in sync without reloading the iframe.
-
-**From inside the mockup**, call the injected helper:
+When the user triggers a state change inside the mockup — wrong password, spinner — keep the toolbar in sync:
 
 ```js
 mnNotifyState('loading');
@@ -198,13 +296,13 @@ mnNotifyState('loading');
 mnNotifyState('error');
 ```
 
-MockNav injects `mnNotifyState` into each iframe after load. It posts a message to the parent, which updates the active state pill and URL hash.
+MockNav injects `mnNotifyState` into each iframe. You can also toggle `body.classList` (`state-error`, etc.); MockNav watches for that and syncs the toolbar.
 
-**Fallback:** if your mockup adds `state-<id>` to `<body>` via JavaScript (instead of calling `mnNotifyState`), MockNav watches `body.classList` and syncs automatically.
+To actually change what is shown, update the DOM or CSS in your click handler — `mnNotifyState` only updates the shell UI.
 
-### State with a separate file
+### Separate file per state
 
-When a state looks completely different from the default, point it at its own file instead:
+When a state is a completely different layout:
 
 ```js
 states: [
@@ -213,57 +311,31 @@ states: [
 ]
 ```
 
-Both options work; use whichever keeps your code simpler.
-
----
-
-## Link navigation
-
-MockNav intercepts clicks on internal links inside the iframe. When a user clicks `<a href="other-page.html">`, MockNav finds the matching page in your config and navigates to it — instead of loading the file inside the iframe alone.
-
-Supported link types:
-
-| href | Behaviour |
-|------|-----------|
-| `login.html` | Navigate to the page whose `file` ends with `login.html` |
-| `login.html?state=error` | Navigate to that page in the `error` state |
-| `#section` | Ignored — normal anchor behaviour |
-| `https://…` | Ignored — opens normally (or use `target="_blank"`) |
-| `mailto:`, `tel:`, `javascript:` | Ignored |
-
-Links are resolved relative to the current iframe URL. If no matching page exists in the config, the link opens in a new tab as a fallback.
-
-Use normal `<a href="…">` tags between mockups to prototype user flows without JavaScript routing.
-
 ---
 
 ## CSS in mockups
 
-Because each mockup runs in its own iframe, styles do not leak between pages. You can use global selectors (`nav`, `h1`, etc.) without affecting other mockups.
+Each mockup runs in its own iframe, so styles do not leak between pages.
 
-**Tailwind CDN** — add the Play CDN script to each mockup’s `<head>`:
+Tailwind works via CDN in each file:
 
 ```html
 <script src="https://cdn.tailwindcss.com"></script>
 ```
 
-Works standalone and inside MockNav. Keep a small `<style>` block for `body.state-*` rules if you use states.
-
-**Optional prefix convention** — some teams still prefix selectors (`.login-`, `.dash-`) for clarity when sharing CSS snippets or opening mockups side by side in separate tabs. It is not required for MockNav isolation.
+Add a `<style>` block for `body.state-*` rules when using states.
 
 ---
 
 ## Device preview
 
-The toolbar has three device buttons that resize the preview viewport with realistic device chrome:
-
 | Button | Shortcut | Size | Simulates |
 |--------|----------|------|-----------|
-| Desktop | `D` | Fluid (max 1440px) | Browser window with macOS-style title bar |
-| Tablet  | `T` | 768 × 946 px | Tablet card |
-| Mobile  | `M` | 393 × 852 px | iPhone 15/16 shell with dynamic island |
+| Desktop | `D` | Fluid (max 1440px) | Browser window |
+| Tablet  | `T` | 768 × 946 px | Tablet |
+| Mobile  | `M` | 393 × 852 px | Phone |
 
-Your mockup should use responsive CSS so it looks right at each width. The stage scrolls if the device frame is taller than the panel.
+Use responsive CSS in your mockups. The stage scrolls if the frame is taller than the panel.
 
 ---
 
@@ -280,178 +352,79 @@ Your mockup should use responsive CSS so it looks right at each width. The stage
 | `1`–`9` | Jump to page by position |
 | `Esc` | Clear search (when search is focused) |
 
-Shortcuts are disabled while typing in an input or textarea.
+Disabled while focus is in an input or textarea.
 
 ---
 
-## Sidebar features
+## Sidebar
 
-**Groups** — pages with the same `group` value are listed under one heading. Pages without a group go under `'Pages'`.
+**Groups** — pages with the same `group` share a heading.
 
-```js
-{ name: 'Login',    file: '...', group: 'Auth' },
-{ name: 'Register', file: '...', group: 'Auth' },
-```
+**Badges** — `new` · `wip` · `done` · `review` on the nav item.
 
-**Badges** — a small coloured label on the nav item. Useful for tracking status across the team.
+**State dots** — coloured circles next to pages with multiple states. Colour is inferred from the state `id` (`error` → red, `loading` → yellow, etc.).
 
-| Value    | Colour |
-|----------|--------|
-| `new`    | Green  |
-| `wip`    | Yellow |
-| `done`   | Blue   |
-| `review` | Pink   |
-
-**State dots** — the small coloured circles next to each page name indicate which states the page has. The colour is inferred from the state `id`:
-
-| id contains | Colour      |
-|-------------|-------------|
-| `error`, `fail` | Red     |
-| `success`, `done`, `complete` | Green |
-| `loading`, `process` | Yellow |
-| `empty`, `new` | Light blue |
-| `active`, `premium` | Purple |
-| other | Grey |
-
-**Search** — the search box filters by page name, group, and tags simultaneously.
+**Search** — filters by name, group, and tags.
 
 ---
 
-## URL hash routing
+## URL hash
 
-The current page and state are kept in the URL hash:
+Current page and state live in the hash:
 
 ```
 index.html#login/error
 ```
 
-Refreshing or sharing this link restores the same view. Hash format: `#<pageId>/<stateId>`.
+Share or refresh that URL to restore the view.
 
 ---
 
-## Open in new tab / copy link
+## Status bar
 
-The status bar shows the path of the current mockup file. The **↗ open** link opens that file directly in a new tab — useful for sharing a specific page with a teammate.
-
-The toolbar **copy link** button copies the iframe URL (including `?state=` when applicable) to the clipboard.
+Shows the current file path. **↗ open** opens the mockup in a new tab. **Copy link** copies the iframe URL (including `?state=` when set).
 
 ---
 
 ## Programmatic API
 
+Called from `index.html` (outside the iframe):
+
 ```js
 MockNav.init({ title: '…', pages: [ /* … */ ] });
-
-MockNav.go('login');              // navigate to a page (optional second arg: stateId)
-MockNav.setState('error');        // switch state on the current page (reloads iframe)
-MockNav.notifyState('loading');   // sync toolbar/hash without reload (same as mnNotifyState)
-MockNav.reload();                 // reload the current iframe
-MockNav.setDevice('mobile');      // 'desktop' | 'tablet' | 'mobile'
+MockNav.go('login', 'error');
+MockNav.setState('loading');
+MockNav.reload();
+MockNav.setDevice('mobile');
 ```
+
+Inside a mockup, use `mnNotifyState('error')` for toolbar sync without reload.
 
 ---
 
 ## Local files (`file://`)
 
-MockNav always loads mockups in an iframe. This works on `file://` — double-click `index.html` and it should work in Chrome, Safari, and Firefox. Scripts inside mockups (Tailwind CDN, inline handlers) run normally.
+MockNav loads mockups in an iframe. Double-clicking `index.html` works in Chrome, Safari, and Firefox.
 
-States still use `?state=` in the iframe URL, so the mockup state snippet in each HTML file works as documented.
-
-For team sharing or when `file://` restrictions apply in your browser, use a local server:
-
-```bash
-npx serve .            # fastest
-python -m http.server  # if you have Python
-```
-
-Or use the **Live Server** extension in VS Code (right-click `index.html` → Open with Live Server).
+If you hit browser restrictions, run a local server: `npx serve .`
 
 ---
 
-## Asking an AI to generate mockups
+## Prompting an AI for mockups
 
-When prompting an AI (Claude, ChatGPT, etc.) to generate a mockup that will be used inside MockNav, include this in your prompt:
+Include in your prompt:
 
-> At the bottom of the file, add this snippet:
+> Use normal `<a href="other-page.html">` links between mockup files for navigation (paths relative to the current file). At the bottom add:
 > ```html
 > <script>
 >   const s = new URLSearchParams(location.search).get('state');
 >   if (s) document.body.classList.add('state-' + s);
 > </script>
 > ```
-> Then write CSS for each state using `body.state-<id>` selectors. Use normal `<a href="other-page.html">` links between mockup files for navigation.
-
-This produces mockups that work both standalone and inside MockNav without any editing.
+> Style states with `body.state-<id>` selectors.
 
 ---
 
-## Full example
+## Live demo
 
-`index.html`:
-
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Demo — Mockups</title>
-</head>
-<body>
-  <script src="https://cdn.jsdelivr.net/npm/mocknav@1.0.0/mocknav.min.js"></script>
-  <script>
-    MockNav.init({
-      title: 'Demo',
-      pages: [
-        {
-          id:    'landing',
-          name:  'Landing',
-          file:  'pages/landing.html',
-          group: 'Public',
-          badge: 'done',
-        },
-        {
-          id:    'login',
-          name:  'Login',
-          file:  'pages/auth/login.html',
-          group: 'Auth',
-          tags:  ['form', 'auth'],
-          states: [
-            { id: 'default', label: 'Default'   },
-            { id: 'error',   label: 'Error'     },
-            { id: 'loading', label: 'Submitting' },
-          ],
-        },
-        {
-          id:    'dashboard',
-          name:  'Dashboard',
-          file:  'pages/app/dashboard.html',
-          group: 'App',
-          badge: 'wip',
-          states: [
-            { id: 'default', label: 'Default' },
-            { id: 'empty',   label: 'Empty'   },
-            { id: 'loading', label: 'Loading' },
-          ],
-        },
-        {
-          id:    'settings',
-          name:  'Settings',
-          file:  'pages/app/settings.html',
-          group: 'App',
-          states: [
-            { id: 'default', label: 'Default' },
-            { id: 'success', label: 'Saved',  file: 'pages/app/settings-saved.html' },
-          ],
-        },
-        {
-          id:    '404',
-          name:  '404',
-          file:  'pages/errors/404.html',
-          group: 'Errors',
-        },
-      ],
-    });
-  </script>
-</body>
-</html>
-```
+The repo includes a working example under `example/`. If you clone it: `npm run demo` → `http://localhost:3000/example/`. You do not need the repo to use MockNav — the CDN script tag is enough.
